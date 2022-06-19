@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-client
+spec:
+  selector:
+    matchLabels:
+      run: http-client-example
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: http-client-example
+    spec:
+      containers:
+        - name: http-client
+          image: python-http-client
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              protocol: TCP
