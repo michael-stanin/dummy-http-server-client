@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from typing import Iterable
 import threading
+import time
 
 class RequestResponse:
     def __init__(self, req_path, req_method='GET', res_code=200, res_content_type='application/json', res_body='') -> None:
@@ -30,19 +31,28 @@ class CustomHTTPServer:
         CustomHandler.req_res = self.__tidy_responses(req_res)
         print(CustomHandler.req_res)
         self.s = HTTPServer((host, port), CustomHandler)
+        self.s.allow_reuse_address = True
 
     def start(self, in_thread=True):
         """starts the server.
         - :param in_thread:  if True, a background thread is started and will serve requests until stop is called, or KeyInterrupt. If False, this method will block until stop() is called from another thread, or KeyboardInterrupt is passed."""
+        self.s.server_activate()
         self.in_thread = in_thread
         if self.in_thread:
-            self.thread = threading.Thread(target=self.s.serve_forever)
-            self.thread.start()            
+            self.thread = threading.Thread(target=self.s.serve_forever, daemon=True)
+            self.thread.start()
+            #self.s.shutdown()
+            while not self.thread.is_alive():
+                print("waiting for thread to start")
+                time.sleep(0.1)
+
+            
         else:
             self.s.serve_forever()
 
     def stop(self):
         if self.in_thread:
+            self.s.server_close()
             self.s.shutdown()
             self.thread.join()
         else:
@@ -83,10 +93,19 @@ if __name__ == '__main__':
     responses = [RequestResponse('/special-request/much-wow/42', res_body=my_json_response),
         RequestResponse('/', res_body='THIS IS A TEXT RESPONSE', res_content_type='text/plain')]
     try:
+        from datetime import datetime
         # See https://pythonspeed.com/articles/docker-connection-refused/ to understand why it's not localhost -> it wouldn't listen on all interfaces and it won't be reachable by other pods
         server = CustomHTTPServer('0.0.0.0',5000, responses)
-        print('Started http server')
+        now = datetime.now()
+        then = now.strftime("%H:%M:%S")
+        print('Started http server: ', then)
         server.start()
+        print(f"thread is alive: {server.thread.is_alive}")
+        print("Starting took Time is :", datetime.now() - now)
+        time.sleep(5)
+        now = datetime.now().strftime("%H:%M:%S")
+        server.stop()
+        print("Stop at Time :", now)
          
     except KeyboardInterrupt:
         print('^C received, shutting down server')
